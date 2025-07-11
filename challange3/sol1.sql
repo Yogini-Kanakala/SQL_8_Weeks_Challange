@@ -77,5 +77,59 @@ LEFT JOIN foodie_fi.plans p ON s.plan_id = p.plan_id
 
 
 
+-- What is the number and percentage of customer plans after their initial free trial?
+
+with data as(
+SELECT  customer_id, plan_id,
+rank() over(partition by customer_id order by start_date) as plan_rank
+
+
+FROM foodie_fi.subscriptions where plan_id!=0
+)
+select 
+COUNT(DISTINCT customer_id) AS customers_after_trial,
+    (COUNT(DISTINCT customer_id) * 100.0 / (SELECT COUNT(DISTINCT customer_id) FROM foodie_fi.subscriptions)) AS percentage_after_trial
+from data 
+WHERE plan_rank > 1
+
+
+
+-- What is the customer count and percentage breakdown of all 5 plan_name values at 2020-12-31?
+
+
+with data as (
+select p.plan_name, 
+count(*) over(partition by p.plan_name),
+rank() over(partition by customer_id order by start_date desc) as plan_rank,
+ COUNT(*) OVER() AS total_count ,
+customer_id
+from foodie_fi.subscriptions s
+left join foodie_fi.plans p
+on s.plan_id=p.plan_id
+where s. start_date <=to_date('2020-12-31','yyyy-mm-dd')
+)
+
+select count(distinct customer_id) ,plan_name,
+  (COUNT(DISTINCT customer_id) * 100.0) / MAX(total_count) AS percentage
+from data where plan_rank=1
+group by plan_name
+
+
+
+-- How many customers have upgraded to an annual plan in 2020?
+
+SELECT COUNT(DISTINCT s.customer_id)
+FROM foodie_fi.subscriptions s
+JOIN foodie_fi.plans p ON s.plan_id = p.plan_id
+WHERE s.start_date BETWEEN '2020-01-01' AND '2020-12-31'
+  AND p.plan_name = 'pro annual'
+  AND s.customer_id IN (
+    SELECT DISTINCT customer_id
+    FROM foodie_fi.subscriptions
+    WHERE start_date BETWEEN '2020-01-01' AND '2020-12-31'
+      AND plan_id != 3
+  );
+
+
 
 
