@@ -132,4 +132,25 @@ WHERE s.start_date BETWEEN '2020-01-01' AND '2020-12-31'
 
 
 
+-- How many days on average does it take for a customer to an annual plan from the day they join Foodie-Fi?
+
+
+WITH join_dates AS (
+  SELECT customer_id,
+         MIN(start_date) AS join_date
+  FROM subscriptions
+  GROUP BY customer_id
+),
+annual_plan_dates AS (
+  SELECT customer_id,
+         MIN(start_date) AS annual_start_date
+  FROM subscriptions
+  WHERE plan_id = 3
+  GROUP BY customer_id
+)
+SELECT AVG(annual_start_date - join_date) AS avg_days_to_annual
+FROM join_dates
+JOIN annual_plan_dates USING (customer_id);
+
+
 
