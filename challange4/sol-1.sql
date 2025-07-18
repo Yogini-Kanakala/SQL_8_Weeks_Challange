@@ -205,3 +205,62 @@ SELECT
 FROM data
 ORDER BY customer_id, txn_month;
 
+
+
+
+
+-- D. Extra Challenge
+-- Data Bank wants to try another option which is a bit more difficult to implement - they want to calculate data growth using an interest calculation, just like in a traditional savings account you might have with a bank.
+
+-- If the annual interest rate is set at 6% and the Data Bank team wants to reward its customers by increasing their data allocation based off the interest calculated on a daily basis at the end of each day, how much data would be required for this option on a monthly basis?
+
+-- Special notes:
+
+-- Data Bank wants an initial calculation which does not allow for compounding interest, 
+-- however they may also be interested in a daily compounding interest calculation so you can try to perform this calculation if you have the stamina!
+
+
+-- simple interest calculation
+
+with  data as (
+SELECT *,to_char(txn_date, 'YYYY-MM') as txn_month,
+date_trunc('MONTH', txn_date) as month_start_date,
+SUM(
+      CASE
+        WHEN txn_type = 'deposit' THEN txn_amount
+        WHEN txn_type IN ('withdrawal', 'purchase') THEN - txn_amount
+        ELSE 0
+      END
+    ) OVER (
+      PARTITION BY customer_id
+      ORDER BY txn_date
+      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS running_balance,
+	lead(txn_date)over(partition by customer_id ,to_char(txn_date,'YYYY_MM') order by txn_date) as next_txn_date,
+	
+	lead(txn_date)over(partition by customer_id ,to_char(txn_date,'YYYY_MM') order by txn_date)-txn_date as days_diff,
+	ROW_NUMBER() OVER (
+      PARTITION BY customer_id, to_char(txn_date, 'YYYY-MM')
+      ORDER BY   txn_date DESC
+    ) AS rn
+	
+
+FROM public.customer_transactions
+where customer_id=1
+)
+select customer_id, txn_date,
+sum(
+case when  next_txn_date is  null 
+then  
+EXTRACT(day FROM (date_trunc('month', month_start_date + interval '1 month') - txn_date)) * running_balance *0.016438 
+else days_diff  * running_balance *0.016438  end 
+
+) over(partition by customer_id,  txn_month order by   txn_month)
+
+-- ,
+-- case when  next_txn_date is  null then  30 - date_part('day',txn_date) * running_balance *0.016438 
+-- else days_diff  * running_balance *0.016438  end 
+from data
+WHERE rn = 1
+
+
